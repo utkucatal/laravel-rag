@@ -1,0 +1,115 @@
+services:
+    app:
+        build:
+            context: docker/engine/php-fpm
+            args:
+                UID: ${UID:-1000}
+                GID: ${GID:-1000}
+        container_name: ${APP_CONTAINER_NAME:-laravel_app}
+        working_dir: /var/www/html/src
+        volumes:
+            - '.:/var/www/html'
+            - './docker/engine/php-fpm/php.ini:/usr/local/etc/php/php.ini'
+            - './docker/engine/php-fpm/xdebug.ini:/usr/local/etc/php/conf.d/zz-xdebug.ini'
+        ports:
+            - '${VITE_PORT:-5173}:5173'   # Vite / Tailwind HMR dev server
+        extra_hosts:
+            - 'host.docker.internal:host-gateway'   # Xdebug -> IDE
+        environment:
+            - PHP_IDE_CONFIG=serverName=laravel
+        tty: true
+        restart: unless-stopped
+        depends_on:
+            - postgres
+            - mysql
+            - mariadb
+        networks:
+            - laravel-network
+
+    webserver:
+        build:
+            context: docker/engine/apache
+        container_name: ${WEBSERVER_CONTAINER_NAME:-laravel_webserver}
+        working_dir: /var/www/html/src
+        volumes:
+            - '.:/var/www/html'
+            - './docker/engine/apache/httpd.conf:/usr/local/apache2/conf/httpd.conf'
+            - './docker/engine/apache/vhost.conf:/usr/local/apache2/conf/extra/vhost.conf'
+        ports:
+            - '${WEBSERVER_PORT:-8080}:80'
+        restart: unless-stopped
+        depends_on:
+            - app
+        networks:
+            - laravel-network
+
+    postgres:
+        image: 'pgvector/pgvector:pg16'
+        container_name: ${POSTGRES_CONTAINER_NAME:-laravel_postgres}
+        environment:
+            - POSTGRES_DB=${POSTGRES_DB:-laravel}
+            - POSTGRES_USER=${POSTGRES_USER:-laravel}
+            - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:-secret}
+            - TZ=Europe/Amsterdam
+        volumes:
+            - './docker/data/postgres:/var/lib/postgresql/data'
+        ports:
+            - '${POSTGRES_PORT:-5432}:5432'
+        restart: unless-stopped
+        healthcheck:
+            test: ['CMD-SHELL', 'pg_isready -U ${POSTGRES_USER:-laravel}']
+            interval: 10s
+            timeout: 5s
+            retries: 5
+        networks:
+            - laravel-network
+
+    mysql:
+        image: 'mysql:8.4'
+        container_name: ${MYSQL_CONTAINER_NAME:-laravel_mysql}
+        environment:
+            - MYSQL_ROOT_PASSWORD=${MYSQL_ROOT_PASSWORD:-secret}
+            - MYSQL_DATABASE=${MYSQL_DATABASE:-laravel}
+            - MYSQL_USER=${MYSQL_USER:-laravel}
+            - MYSQL_PASSWORD=${MYSQL_PASSWORD:-secret}
+            - TZ=Europe/Amsterdam
+        volumes:
+            - './docker/data/mysql:/var/lib/mysql'
+        ports:
+            - '${MYSQL_PORT:-3307}:3306'
+        command: --max-allowed-packet=256M --sql-mode=""
+        restart: unless-stopped
+        healthcheck:
+            test: ['CMD', 'mysqladmin', 'ping', '-h', 'localhost', '-p${MYSQL_ROOT_PASSWORD:-secret}']
+            interval: 10s
+            timeout: 5s
+            retries: 5
+        networks:
+            - laravel-network
+
+    mariadb:
+        image: 'mariadb:11.4'
+        container_name: ${MARIADB_CONTAINER_NAME:-laravel_mariadb}
+        environment:
+            - MARIADB_ROOT_PASSWORD=${MARIADB_ROOT_PASSWORD:-secret}
+            - MARIADB_DATABASE=${MARIADB_DATABASE:-laravel}
+            - MARIADB_USER=${MARIADB_USER:-laravel}
+            - MARIADB_PASSWORD=${MARIADB_PASSWORD:-secret}
+            - TZ=Europe/Amsterdam
+        volumes:
+            - './docker/data/mariadb:/var/lib/mysql'
+        ports:
+            - '${MARIADB_PORT:-3308}:3306'
+        command: --max-allowed-packet=256M --sql-mode=""
+        restart: unless-stopped
+        healthcheck:
+            test: ['CMD', 'healthcheck.sh', '--connect', '--innodb_initialized']
+            interval: 10s
+            timeout: 5s
+            retries: 5
+        networks:
+            - laravel-network
+
+networks:
+    laravel-network:
+        driver: bridge

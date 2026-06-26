@@ -1,0 +1,8 @@
+.git
+.idea
+.DS_Store
+docker/data
+docker/log
+src/node_modules
+src/vendor
+src/storage/*.key

@@ -1,0 +1,24 @@
+# --- OS / editor ---
+.DS_Store
+Thumbs.db
+/.idea/
+/.vscode/
+/.fleet/
+
+# --- Secrets / environment (.env'ler ASLA commitlenmez) ---
+.env
+.env.backup
+.env.*.local
+
+# --- Docker runtime: lokal DB verisi ve loglar (büyük) ---
+/docker/data/
+/docker/log/
+
+# --- Scratch ---
+/test.php
+
+#     (template'in kendi .git geçmişi + webpack kaynağı gereksiz, dışlanır) ---
+/src/public/template/*
+!/src/public/template/static/
+
+/src/catalog.json
